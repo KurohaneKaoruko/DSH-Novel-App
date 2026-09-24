@@ -1,0 +1,156 @@
+name: build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  verify-kernel:
+    name: 内核 ACP 冒烟测试
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: 安装工具依赖并生成智能体
+        run: |
+          npm --cache .npm-cache install --no-audit --no-fund
+          node scripts/generate-agents.mjs
+      - name: 安装内核
+        run: node scripts/kernel-install.mjs
+      - name: ACP 交互式冒烟测试（stock acp profile）
+        run: |
+          chmod +x kernel/node_modules/node-pty/prebuilds/linux-x64/spawn-helper || true
+          node scripts/verify-acp-live.mjs --home .testhome --profile acp
+      - name: ACP 交互式冒烟测试（novel profile + 预设）
+        run: node scripts/verify-acp-live.mjs --home .testhome --profile novel 2>&1 | tee verify-acp.log
+
+  build:
+    name: 构建 ${{ matrix.name }}
+    needs: verify-kernel
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows-x64
+            os: windows-latest
+            platform: win
+            arch: x64
+            variant: full
+          - name: macos-arm64
+            os: macos-latest
+            platform: mac
+            arch: arm64
+            variant: full
+          - name: linux-x64
+            os: ubuntu-latest
+            platform: linux
+            arch: x64
+            variant: full
+          - name: windows-x64-online
+            os: windows-latest
+            platform: win
+            arch: x64
+            variant: online
+          - name: macos-arm64-online
+            os: macos-latest
+            platform: mac
+            arch: arm64
+            variant: online
+          - name: linux-x64-online
+            os: ubuntu-latest
+            platform: linux
+            arch: x64
+            variant: online
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri
+      - name: Linux 依赖（Tauri）
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
+            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libfuse2
+      - name: 安装工具依赖并生成智能体
+        shell: bash
+        working-directory: app
+        run: |
+          set -o pipefail
+          for i in 1 2 3; do
+            npm --cache .npm-cache install --no-audit --no-fund 2>&1 | tee npm-install.log && break
+            echo "npm install 重试 $i/3 …"; sleep 8
+          done
+          node scripts/generate-agents.mjs 2>&1 | tee agents-gen.log
+      - name: 安装内核
+        working-directory: app
+        run: node scripts/kernel-install.mjs
+      - name: 构建打包（Tauri）
+        working-directory: app
+        run: node scripts/build.mjs ${{ matrix.variant == 'online' && '--online' || '' }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: DSH-Novel-${{ matrix.name }}
+          path: |
+            app/dist/*.zip
+            app/dist/*.exe
+            app/dist/*.dmg
+            app/dist/*.deb
+            app/dist/checksums.txt
+            app/dist/build-failure.txt
+            app/npm-install.log
+            app/agents-gen.log
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: 失败诊断写入注解（匿名可读）
+        if: failure()
+        shell: bash
+        working-directory: app
+        run: |
+          if [ -f dist/build-failure.txt ]; then
+            grep -aiE 'error\[|error:|failed|--> |thrown' dist/build-failure.txt | tail -n 30 | while IFS= read -r line; do
+              echo "::error::${line:0:300}"
+            done
+          fi
+
+  release:
+    name: 发布 Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: dist
+      - name: 生成校验和
+        run: |
+          cd dist && sha256sum * > checksums.txt || true
+      - uses: softprops/action-gh-release@v2
+        with:
+          overwrite: true
+          files: |
+            dist/*.zip
+            dist/*.exe
+            dist/*.dmg
+            dist/*.deb
+            dist/checksums.txt
+          generate_release_notes: true
