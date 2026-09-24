@@ -15,8 +15,11 @@ import url from "node:url";
 import yaml from "js-yaml";
 
 const appRoot = path.resolve(url.fileURLToPath(new URL("..", import.meta.url)));
-const repoRoot = path.resolve(appRoot, "..");
-const baseDir = path.join(repoRoot, "novelist");
+// 基准目录：独立仓库用 agents/novelist/（随仓库提交）；mono 开发树用根 novelist/。
+const vendored = path.join(appRoot, "agents", "novelist");
+const baseDir = fs.existsSync(path.join(vendored, "preset.yml"))
+  ? vendored
+  : path.resolve(appRoot, "..", "novelist");
 const agentsDir = path.join(appRoot, "agents");
 const stylesFile = path.join(agentsDir, "styles.yml");
 
