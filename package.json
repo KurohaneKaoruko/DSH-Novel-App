@@ -1,0 +1,17 @@
+{
+  "name": "dsh-novel-workspace",
+  "private": true,
+  "description": "DSH-Novel 工作区：agent 预设生成与桌面端构建工具链（应用本体在 app/，内核钉住在 kernel/）",
+  "type": "module",
+  "scripts": {
+    "agents": "node scripts/generate-agents.mjs",
+    "agents:clean": "node scripts/generate-agents.mjs --clean",
+    "kernel:install": "node scripts/kernel-install.mjs",
+    "verify:kernel": "node scripts/verify-kernel.mjs",
+    "build": "node scripts/build.mjs"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.5",
+    "js-yaml": "^4.1.0"
+  }
+}

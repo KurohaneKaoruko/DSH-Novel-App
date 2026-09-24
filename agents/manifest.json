@@ -1,0 +1,51 @@
+[
+  {
+    "key": "novelist",
+    "dir": "novelist",
+    "name": "小说助手",
+    "tag": "通用",
+    "description": "以写小说为核心的全能创作 Agent（基准预设，维护在仓库根 novelist/）"
+  },
+  {
+    "key": "novelist-hotblood",
+    "dir": "novelist-hotblood",
+    "name": "小说助手·热血爽文",
+    "tag": "热血爽文",
+    "description": "男频热血爽文专精：升级流、打脸四拍、爽点升级链与期待感管理。继承小说助手全套方法论 skill 与 7 个 novel_* 工具，人设针对热血爽文的节奏、装逼打脸、金手指设计与章末钩子做了专门强化。"
+  },
+  {
+    "key": "novelist-romance",
+    "dir": "novelist-romance",
+    "name": "小说助手·甜宠言情",
+    "tag": "甜宠言情",
+    "description": "女频甜宠言情专精：心动瞬间设计、糖点节奏、双视角拉扯与情感线长线管理。继承小说助手全套方法论 skill 与 7 个 novel_* 工具，人设针对甜宠的情感浓度、日常糖点与误会分寸做了专门强化。"
+  },
+  {
+    "key": "novelist-mystery",
+    "dir": "novelist-mystery",
+    "name": "小说助手·悬疑诡秘",
+    "tag": "悬疑诡秘",
+    "description": "悬疑/诡秘/克苏鲁风专精：谜面设计、线索公平性、恐怖氛围与多层反转。继承小说助手全套方法论 skill 与 7 个 novel_* 工具，人设针对悬念钩织、氛围渲染与逻辑闭环做了专门强化。"
+  },
+  {
+    "key": "novelist-xianxia",
+    "dir": "novelist-xianxia",
+    "name": "小说助手·仙侠武侠",
+    "tag": "仙侠武侠",
+    "description": "古风仙侠/武侠专精：古典语感、修炼体系、江湖庙堂与意境打斗。继承小说助手全套方法论 skill 与 7 个 novel_* 工具，人设针对古风语感、体系自洽与武侠意境做了专门强化。"
+  },
+  {
+    "key": "novelist-scifi",
+    "dir": "novelist-scifi",
+    "name": "小说助手·科幻末世",
+    "tag": "科幻末世",
+    "description": "科幻/末世专精：设定推演、硬核细节的分寸、废土生存与人性抉择。继承小说助手全套方法论 skill 与 7 个 novel_* 工具，人设针对科幻设定自洽、技术细节颗粒度与末世生存压力做了专门强化。"
+  },
+  {
+    "key": "novelist-lightnovel",
+    "dir": "novelist-lightnovel",
+    "name": "小说助手·轻小说",
+    "tag": "轻小说",
+    "description": "轻小说/二次元风专精：吐槽与梗的分寸、角色萌点、日常与主线的配比。继承小说助手全套方法论 skill 与 7 个 novel_* 工具，人设针对轻快语感、角色声线区分与搞笑正经的节奏切换做了专门强化。"
+  }
+]

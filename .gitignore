@@ -1,0 +1,14 @@
+node_modules/
+.npm-cache/
+.pub-cache/
+dist/
+.tmp/
+.preview-home/
+
+# Tauri
+src-tauri/target/
+src-tauri/staging/
+src-tauri/gen/
+
+# 智能体库生成物（styles.yml 为源；novelist/ 为基准备份可提交）
+agents/novelist-*/
