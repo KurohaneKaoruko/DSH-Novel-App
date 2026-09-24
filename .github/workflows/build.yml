@@ -14,9 +14,6 @@ jobs:
   verify-kernel:
     name: 内核 ACP 冒烟测试
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: app
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -81,7 +78,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: swatinem/rust-cache@v2
         with:
-          workspaces: app/src-tauri
+          workspaces: src-tauri
       - name: Linux 依赖（Tauri）
         if: runner.os == 'Linux'
         run: |
@@ -90,7 +87,6 @@ jobs:
             libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libfuse2
       - name: 安装工具依赖并生成智能体
         shell: bash
-        working-directory: app
         run: |
           set -o pipefail
           for i in 1 2 3; do
@@ -99,31 +95,28 @@ jobs:
           done
           node scripts/generate-agents.mjs 2>&1 | tee agents-gen.log
       - name: 安装内核
-        working-directory: app
         run: node scripts/kernel-install.mjs
       - name: 构建打包（Tauri）
-        working-directory: app
         run: node scripts/build.mjs ${{ matrix.variant == 'online' && '--online' || '' }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: DSH-Novel-${{ matrix.name }}
           path: |
-            app/dist/*.zip
-            app/dist/*.exe
-            app/dist/*.dmg
-            app/dist/*.deb
-            app/dist/checksums.txt
-            app/dist/build-failure.txt
-            app/npm-install.log
-            app/agents-gen.log
+            dist/*.zip
+            dist/*.exe
+            dist/*.dmg
+            dist/*.deb
+            dist/checksums.txt
+            dist/build-failure.txt
+            npm-install.log
+            agents-gen.log
           retention-days: 14
           if-no-files-found: ignore
 
       - name: 失败诊断写入注解（匿名可读）
         if: failure()
         shell: bash
-        working-directory: app
         run: |
           if [ -f dist/build-failure.txt ]; then
             grep -aiE 'error\[|error:|failed|--> |thrown' dist/build-failure.txt | tail -n 30 | while IFS= read -r line; do
