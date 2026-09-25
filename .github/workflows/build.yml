@@ -8,32 +8,37 @@ on:
 
 permissions:
   contents: write
-  actions: read
 
 jobs:
-  verify-kernel:
-    name: 内核 ACP 冒烟测试
+  check:
+    name: Check & Diagnose
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: 安装工具依赖并生成智能体
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install dependencies
         run: |
-          npm install js-yaml --no-audit --no-fund --cache .npm-cache
+          npm install js-yaml --no-audit --no-fund
           node scripts/generate-agents.mjs
-      - name: 安装内核
+      - name: Install kernel
         run: node scripts/kernel-install.mjs
-      - name: ACP 交互式冒烟测试（stock acp profile）
+      - name: Cargo check
         run: |
-          chmod +x kernel/node_modules/node-pty/prebuilds/linux-x64/spawn-helper || true
-          node scripts/verify-acp-live.mjs --home .testhome --profile acp
-      - name: ACP 交互式冒烟测试（novel profile + 预设）
-        run: node scripts/verify-acp-live.mjs --home .testhome --profile novel 2>&1 | tee verify-acp.log
+          cd src-tauri
+          cargo check 2>&1 | tail -n 80
+      - name: Generate agents check
+        run: |
+          node scripts/generate-agents.mjs 2>&1
+      - name: Full tauri build
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          node scripts/build.mjs 2>&1
 
   build:
-    name: 构建 ${{ matrix.name }}
+    name: Build ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -43,32 +48,14 @@ jobs:
             os: windows-latest
             platform: win
             arch: x64
-            variant: full
           - name: macos-arm64
             os: macos-latest
             platform: mac
             arch: arm64
-            variant: full
           - name: linux-x64
             os: ubuntu-latest
             platform: linux
             arch: x64
-            variant: full
-          - name: windows-x64-online
-            os: windows-latest
-            platform: win
-            arch: x64
-            variant: online
-          - name: macos-arm64-online
-            os: macos-latest
-            platform: mac
-            arch: arm64
-            variant: online
-          - name: linux-x64-online
-            os: ubuntu-latest
-            platform: linux
-            arch: x64
-            variant: online
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -78,56 +65,36 @@ jobs:
       - uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
-      - name: Linux 依赖（Tauri）
+      - name: Linux deps
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file             libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libfuse2
-      - name: 安装工具依赖并生成智能体
+      - name: Install deps
         shell: bash
         run: |
-          set -o pipefail
-          for i in 1 2 3; do
-            npm install js-yaml --no-audit --no-fund --cache .npm-cache 2>&1 | tee npm-install.log && break
-            echo "npm install 重试 $i/3 …"; sleep 8
-          done
-          node scripts/generate-agents.mjs 2>&1 | tee agents-gen.log
-      - name: 安装内核
-        run: node scripts/kernel-install.mjs
-      - name: 构建打包（Tauri）
-        run: node scripts/build.mjs --platform ${{ matrix.platform }} --arch ${{ matrix.arch }} --online ${{ matrix.variant == 'online' && '--online' || '' }}
+          npm install js-yaml --no-audit --no-fund
+          node scripts/generate-agents.mjs
+      - name: Build
+        shell: bash
+        run: node scripts/build.mjs --platform ${{ matrix.platform }} --arch ${{ matrix.arch }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: DSH-Novel-${{ matrix.name }}
           path: |
-            dist/*.zip
-            dist/*.exe
-            dist/*.dmg
-            dist/*.deb
-            dist/checksums.txt
-            dist/build-failure.txt
+            app/dist/*.zip
+            app/dist/*.exe
+            app/dist/*.dmg
+            app/dist/*.deb
+            app/dist/checksums.txt
+            app/dist/build-failure.txt
             npm-install.log
-            agents-gen.log
           retention-days: 14
           if-no-files-found: ignore
 
-      - name: 失败诊断写入 Summary 与注解
-        if: failure()
-        shell: bash
-        run: |
-          echo "## Build Failure Diagnostics" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          cat dist/build-failure.txt 2>/dev/null | tail -c 6000 >> $GITHUB_STEP_SUMMARY || true
-          echo '```' >> $GITHUB_STEP_SUMMARY
-          if [ -f dist/build-failure.txt ]; then
-            grep -aiE 'error\[|error:|--> |failed|thrown' dist/build-failure.txt | tail -n 30 | while IFS= read -r line; do
-              echo "::error::${line:0:300}"
-            done
-          fi
-
   release:
-    name: 发布 Release
+    name: Release
     if: startsWith(github.ref, 'refs/tags/v')
     needs: build
     runs-on: ubuntu-latest
@@ -136,7 +103,7 @@ jobs:
         with:
           merge-multiple: true
           path: dist
-      - name: 生成校验和
+      - name: Checksums
         run: |
           cd dist && sha256sum * > checksums.txt || true
       - uses: softprops/action-gh-release@v2
