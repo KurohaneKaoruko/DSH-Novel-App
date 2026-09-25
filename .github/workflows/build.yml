@@ -21,7 +21,7 @@ jobs:
           node-version: 22
       - name: 安装工具依赖并生成智能体
         run: |
-          npm --cache .npm-cache install --no-audit --no-fund
+          npm install js-yaml --no-audit --no-fund --cache .npm-cache
           node scripts/generate-agents.mjs
       - name: 安装内核
         run: node scripts/kernel-install.mjs
@@ -34,7 +34,6 @@ jobs:
 
   build:
     name: 构建 ${{ matrix.name }}
-    needs: verify-kernel
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -90,7 +89,7 @@ jobs:
         run: |
           set -o pipefail
           for i in 1 2 3; do
-            npm --cache .npm-cache install --no-audit --no-fund 2>&1 | tee npm-install.log && break
+            npm install js-yaml --no-audit --no-fund --cache .npm-cache 2>&1 | tee npm-install.log && break
             echo "npm install 重试 $i/3 …"; sleep 8
           done
           node scripts/generate-agents.mjs 2>&1 | tee agents-gen.log

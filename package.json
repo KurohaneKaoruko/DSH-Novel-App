@@ -12,6 +12,6 @@
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.11.5",
-    "js-yaml": "^4.1.0"
+    "js-yaml": "^4.3.2"
   }
 }
