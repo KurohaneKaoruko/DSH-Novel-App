@@ -67,10 +67,15 @@ function copyDir(src, dest) {
   }
 }
 
-// ---- 1. 基准副本：agents/novelist（每次全量刷新） ----
-fs.rmSync(path.join(agentsDir, "novelist"), { recursive: true, force: true });
-copyDir(baseDir, path.join(agentsDir, "novelist"));
-console.log("copied  novelist — 小说助手（基准副本）");
+// ---- 1. 基准副本：agents/novelist（每次全量刷新；vendored 模式下跳过自复制） ----
+const baseCopy = path.join(agentsDir, "novelist");
+if (path.resolve(baseDir) !== path.resolve(baseCopy)) {
+  fs.rmSync(baseCopy, { recursive: true, force: true });
+  copyDir(baseDir, baseCopy);
+  console.log("copied  novelist — 小说助手（基准副本）");
+} else {
+  console.log("kept    novelist — 基准即 vendored 副本");
+}
 
 // ---- 2. 风格预设 ----
 const manifest = [
