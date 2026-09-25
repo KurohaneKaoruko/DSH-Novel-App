@@ -82,8 +82,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
-            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libfuse2
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file             libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libfuse2
       - name: 安装工具依赖并生成智能体
         shell: bash
         run: |
@@ -96,7 +95,7 @@ jobs:
       - name: 安装内核
         run: node scripts/kernel-install.mjs
       - name: 构建打包（Tauri）
-        run: node scripts/build.mjs ${{ matrix.variant == 'online' && '--online' || '' }}
+        run: node scripts/build.mjs --platform ${{ matrix.platform }} --arch ${{ matrix.arch }} --online ${{ matrix.variant == 'online' && '--online' || '' }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -113,12 +112,16 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
 
-      - name: 失败诊断写入注解（匿名可读）
+      - name: 失败诊断写入 Summary 与注解
         if: failure()
         shell: bash
         run: |
+          echo "## Build Failure Diagnostics" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat dist/build-failure.txt 2>/dev/null | tail -c 6000 >> $GITHUB_STEP_SUMMARY || true
+          echo '```' >> $GITHUB_STEP_SUMMARY
           if [ -f dist/build-failure.txt ]; then
-            grep -aiE 'error\[|error:|failed|--> |thrown' dist/build-failure.txt | tail -n 30 | while IFS= read -r line; do
+            grep -aiE 'error\[|error:|--> |failed|thrown' dist/build-failure.txt | tail -n 30 | while IFS= read -r line; do
               echo "::error::${line:0:300}"
             done
           fi
