@@ -60,20 +60,8 @@ fn boot_app(handle: &tauri::AppHandle) -> BoxResult<()> {
     // 2. 后台拉起内核（provision → dsh web → token URL → 主窗口跳转）
     let h = handle.clone();
     std::thread::spawn(move || {
-        let result = kernel::boot(h.clone());
-        if let Err(e) = result {
-            let msg = e.to_string();
-            eprintln!("[dsh-novel] 内核启动失败：{msg}");
-            // 错误浮层显示在加载页（双击启动时无终端可看）
-            let h2 = h.clone();
-            let _ = h.run_on_main_thread(move || {
-                if let Some(w) = h2.get_webview_window("main") {
-                    let json = serde_json::json!(msg).to_string();
-                    let _ = w.eval(&format!(
-                        "var d=document.getElementById('boot-msg');if(d){{d.textContent='启动失败：'+{json};d.style.display='block';var s=document.querySelector('.bar');if(s)s.style.display='none';}}"
-                    ));
-                }
-            });
+        if let Err(e) = kernel::boot(h) {
+            eprintln!("[dsh-novel] 内核启动失败：{e}");
         }
     });
     Ok(())

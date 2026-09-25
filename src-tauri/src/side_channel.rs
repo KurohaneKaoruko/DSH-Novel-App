@@ -8,15 +8,7 @@ use std::sync::Arc;
 use tauri::{AppHandle, Manager};
 use tiny_http::{Header, ListenAddr, Method, Response, Server};
 
-use crate::kernel::{self, Paths};
-use std::sync::Mutex as StdMutex;
-
-/// 更新流程状态（面板轮询）。
-pub static UPDATE_STATUS: StdMutex<String> = StdMutex::new(String::new());
-
-fn update_status() -> String {
-    UPDATE_STATUS.lock().map(|v| v.clone()).unwrap_or_default()
-}
+use crate::kernel::Paths;
 
 const MAX_READ: u64 = 4 * 1024 * 1024;
 
@@ -29,9 +21,8 @@ pub fn start(handle: AppHandle, paths: Paths) -> Result<u16, String> {
     };
 
     let _paths = Arc::new(paths);
-    let handle2 = handle.clone();
+    let h = handle.clone();
     std::thread::spawn(move || {
-        let handle = handle2;
         for mut request in server.incoming_requests() {
             let method = request.method().clone();
             let url = request.url().to_string();
@@ -65,47 +56,6 @@ pub fn start(handle: AppHandle, paths: Paths) -> Result<u16, String> {
                 (Method::Get, "/api/prefs") => prefs_get(&h),
                 (Method::Post, "/api/prefs") => prefs_set(&h, &payload),
                 (Method::Get, "/api/health") => (200, r#"{"ok":true}"#.into()),
-                (Method::Get, "/api/kernel/update-check") => {
-                    let h = handle.clone();
-                    match kernel::check_update(&paths.base) {
-                        Ok(v) => (200, serde_json::to_string(&v).unwrap_or_default()),
-                        Err(e) => jerr(e.to_string()),
-                    }
-                }
-                (Method::Post, "/api/kernel/update") => {
-                    let version = s(&payload, "version").unwrap_or("").to_string();
-                    if version.is_empty() {
-                        jerr("missing version")
-                    } else {
-                        {
-                            let mut st = UPDATE_STATUS.lock().unwrap();
-                            *st = "updating".to_string();
-                        }
-                        let h = handle.clone();
-                        let v = version.clone();
-                        std::thread::spawn(move || {
-                            let paths = kernel::resolve_paths(&h).expect("paths");
-                            let set_status = |m: String| {
-                                if let Ok(mut st) = UPDATE_STATUS.lock() {
-                                    *st = m;
-                                }
-                            };
-                            let r = kernel::upgrade_kernel(&paths.base, &paths.dsh_home, &v, &set_status);
-                            let ok = r.is_ok();
-                            if let Ok(mut st) = UPDATE_STATUS.lock() {
-                                *st = if ok { format!("done:{}", v) } else { format!("error:{}", r.unwrap_err()) };
-                            }
-                            if ok {
-                                let _ = kernel::restart_web(h.clone());
-                            }
-                        });
-                        (200, r#"{"started":true}"#.to_string())
-                    }
-                }
-                (Method::Get, "/api/kernel/update-status") => {
-                    let st = UPDATE_STATUS.lock().map(|v| v.clone()).unwrap_or_default();
-                    (200, serde_json::json!({ "status": st }).to_string())
-                }
                 _ => (404, r#"{"error":"not found"}"#.into()),
             };
 

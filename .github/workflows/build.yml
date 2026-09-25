@@ -10,33 +10,6 @@ permissions:
   contents: write
 
 jobs:
-  check:
-    name: Check & Diagnose
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Install dependencies
-        run: |
-          npm install js-yaml --no-audit --no-fund
-          node scripts/generate-agents.mjs
-      - name: Install kernel
-        run: node scripts/kernel-install.mjs
-      - name: Cargo check
-        run: |
-          cd src-tauri
-          cargo check 2>&1 | tail -n 80
-      - name: Generate agents check
-        run: |
-          node scripts/generate-agents.mjs 2>&1
-      - name: Full tauri build
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: |
-          node scripts/build.mjs 2>&1
-
   build:
     name: Build ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
@@ -46,16 +19,10 @@ jobs:
         include:
           - name: windows-x64
             os: windows-latest
-            platform: win
-            arch: x64
           - name: macos-arm64
             os: macos-latest
-            platform: mac
-            arch: arm64
           - name: linux-x64
             os: ubuntu-latest
-            platform: linux
-            arch: x64
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -69,29 +36,37 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file             libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libfuse2
-      - name: Install deps
-        shell: bash
-        run: |
-          npm install js-yaml --no-audit --no-fund
-          node scripts/generate-agents.mjs
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file \
+            libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libfuse2
+      - name: Generate agents
+        run: node scripts/generate-agents.mjs
+      - name: Install kernel
+        run: node scripts/kernel-install.mjs
       - name: Build
-        shell: bash
-        run: node scripts/build.mjs --platform ${{ matrix.platform }} --arch ${{ matrix.arch }}
-      - uses: actions/upload-artifact@v4
+        run: node scripts/build.mjs
+      - name: Upload artifacts
         if: always()
+        uses: actions/upload-artifact@v4
         with:
           name: DSH-Novel-${{ matrix.name }}
           path: |
-            app/dist/*.zip
-            app/dist/*.exe
-            app/dist/*.dmg
-            app/dist/*.deb
-            app/dist/checksums.txt
-            app/dist/build-failure.txt
-            npm-install.log
+            dist/*.zip
+            dist/*.exe
+            dist/*.dmg
+            dist/*.deb
+            dist/checksums.txt
+            dist/build-failure.txt
           retention-days: 14
           if-no-files-found: ignore
+      - name: Failure diagnostics
+        if: failure()
+        shell: bash
+        run: |
+          if [ -f dist/build-failure.txt ]; then
+            grep -aiE 'error\[|error:|--> |failed|thrown' dist/build-failure.txt | tail -n 30 | while IFS= read -r line; do
+              echo "::error::${line:0:300}"
+            done
+          fi
 
   release:
     name: Release

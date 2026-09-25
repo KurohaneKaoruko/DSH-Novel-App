@@ -21,7 +21,6 @@ const tauriDir = path.join(appRoot, "src-tauri");
 
 const args = process.argv.slice(2);
 const has = (f) => args.includes(f);
-const NODE_VERSION = "24.19.0";
 const platform = process.platform === "win32" ? "win" : process.platform === "darwin" ? "mac" : "linux";
 const arch = process.arch;
 const buildLog = [];
@@ -38,7 +37,7 @@ function sh(file, cmdArgs, opts = {}) {
   const err = res.stderr ? res.stderr.toString() : "";
   if (out) process.stdout.write(out);
   if (err) process.stderr.write(err);
-  buildLog.push((out + "\n" + err).slice(-8000));
+  buildLog.push((out + "\n" + err).slice(-4000));
   if (res.error) throw res.error;
   if (res.status !== 0) {
     throw new Error(file + " 失败（exit " + res.status + "）\n" + err.slice(-2000));
@@ -156,27 +155,16 @@ function copyDir(src, dest, filter) {
 }
 
 // kernel（node_modules 全量 → 按目标平台剪除死重）
-// --online 模式：安装器不带内核与 Node——首启由 Rust 下载器按 manifest 拉取。
-const online = has("--online");
-if (!online) {
-  copyDir(path.join(appRoot, "kernel"), path.join(staging, "kernel"));
-  pruneKernel(staging, platform, arch);
-} else {
-  const manifest = {
-    mode: "online",
-    dsh: "0.1.2-rc.1",
-    node: NODE_VERSION,
-  };
-  fs.writeFileSync(path.join(staging, "kernel-manifest.json"), JSON.stringify(manifest, null, 2) + "\n", "utf8");
-}
+copyDir(path.join(appRoot, "kernel"), path.join(staging, "kernel"));
+pruneKernel(staging, platform, arch);
 // agents（平铺库；排除 styles.yml 源文件）
 copyDir(path.join(appRoot, "agents"), path.join(staging, "agents"), (name) => name === "styles.yml");
 // scripts（provision）
 fs.mkdirSync(path.join(staging, "scripts"), { recursive: true });
 fs.copyFileSync(path.join(appRoot, "scripts", "provision-home.mjs"), path.join(staging, "scripts", "provision-home.mjs"));
 
-// node 运行时（online 模式：不打包，首启由 Rust 下载器拉取）
-if (!online) {
+// node 运行时
+const NODE_VERSION = "24.19.0";
 const nodeDir = path.join(staging, "node");
 fs.mkdirSync(nodeDir, { recursive: true });
 
@@ -223,7 +211,6 @@ if (platform === "win") {
 }
 fs.rmSync(extractDir, { recursive: true, force: true });
 log("staging 就绪");
-} // end if (!online)
 
 // ---- 3. tauri build ----------------------------------------------------------
 
@@ -249,10 +236,9 @@ function collect(rel, outName) {
   artifacts.push(dest);
   log("收集 " + outName);
 }
-const variant = online ? "-online" : "";
-collect(path.join("nsis", "DSH-Novel_1.0.0_x64-setup.exe"), "DSH-Novel-setup-x64" + variant + ".exe");
-collect(path.join("dmg", "DSH-Novel_1.0.0_aarch64.dmg"), "DSH-Novel-macos-arm64" + variant + ".dmg");
-collect(path.join("deb", "dsh-novel_1.0.0_amd64.deb"), "DSH-Novel-linux-x64" + variant + ".deb");
+collect(path.join("nsis", "DSH-Novel_1.0.0_x64-setup.exe"), "DSH-Novel-setup-x64.exe");
+collect(path.join("dmg", "DSH-Novel_1.0.0_aarch64.dmg"), "DSH-Novel-macos-arm64.dmg");
+collect(path.join("deb", "dsh-novel_1.0.0_amd64.deb"), "DSH-Novel-linux-x64.deb");
 
 // ---- 5. 便携 zip（exe/app + resources） ---------------------------------------
 

@@ -211,7 +211,7 @@
     "color:inherit;font-size:12px;outline:none;}",
   ].join("");
 
-  var root, tab, panel, treeEl, viewEl, bodyEl, fileLabel, wordsEl, editBtnState, kernelBtn;
+  var root, tab, panel, treeEl, viewEl, bodyEl, fileLabel, wordsEl, editBtnState;
 
   function build() {
     var style = el("style", { text: CSS });
@@ -237,7 +237,6 @@
     var viewbar = el("div", { class: "dn-viewbar" });
     fileLabel = el("div", { class: "dn-file", text: "未打开文件" });
     wordsEl = el("div", { class: "dn-words", text: "" });
-    kernelBtn = el("button", { class: "dn-btn", text: "内核", onclick: kernelUpdateFlow });
     editBtnState = el("button", { class: "dn-btn", text: "编辑", onclick: startEdit });
     viewbar.appendChild(fileLabel);
     viewbar.appendChild(wordsEl);
@@ -556,46 +555,6 @@
       else inWord = false;
     }
     return cjk + word;
-  }
-
-  // ---------- 内核更新 ----------
-  function kernelUpdateFlow() {
-    if (window.__dnKernelBusy) return;
-    window.__dnKernelBusy = true;
-    kernelBtn.textContent = "检查中…";
-    api("/api/kernel/update-check").then(function (v) {
-      window.__dnKernelBusy = false;
-      if (!v.hasUpdate) {
-        kernelBtn.textContent = "内核 " + (v.current || "latest") + " ✓";
-        setTimeout(function () { kernelBtn.textContent = "内核"; }, 2500);
-        return;
-      }
-      if (confirm("发现新内核 " + v.latest + "（当前 " + (v.current || "未安装") + "）。升级并重启？")) {
-        kernelBtn.textContent = "升级中…";
-        api("/api/kernel/update", { version: v.latest }).then(function () {
-          var timer = setInterval(function () {
-            fetch(API + "/api/kernel/update-status").then(function (r) { return r.json(); }).then(function (st) {
-              kernelBtn.textContent = st.status || "…";
-              if (st.status && st.status.indexOf("done:") === 0) {
-                clearInterval(timer);
-                toast("内核已升级到 " + st.status.slice(5) + "，页面即将刷新");
-                setTimeout(function () { location.reload(); }, 1500);
-              } else if (st.status && st.status.indexOf("error:") === 0) {
-                clearInterval(timer);
-                kernelBtn.textContent = "升级失败";
-                toast(st.status, true);
-              }
-            });
-          }, 2000);
-        });
-      } else {
-        kernelBtn.textContent = "内核";
-      }
-    }).catch(function (e) {
-      window.__dnKernelBusy = false;
-      kernelBtn.textContent = "内核";
-      toast(e.message, true);
-    });
   }
 
   // 启动
