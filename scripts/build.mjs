@@ -38,7 +38,7 @@ function sh(file, cmdArgs, opts = {}) {
   const err = res.stderr ? res.stderr.toString() : "";
   if (out) process.stdout.write(out);
   if (err) process.stderr.write(err);
-  buildLog.push((out + "\n" + err).slice(-4000));
+  buildLog.push((out + "\n" + err).slice(-8000));
   if (res.error) throw res.error;
   if (res.status !== 0) {
     throw new Error(file + " 失败（exit " + res.status + "）\n" + err.slice(-2000));
