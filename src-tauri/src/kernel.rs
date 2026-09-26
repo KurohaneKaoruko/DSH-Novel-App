@@ -9,6 +9,21 @@ use tauri::{AppHandle, Manager};
 
 pub type BoxResult<T> = Result<T, Box<dyn std::error::Error>>;
 
+/// 规范化为干净的绝对路径：解析 .. / 符号链接，并剥离 Windows \\?\ verbatim 前缀，
+/// 避免 verbatim 形态传入下游（node/dsh 内部路径拼接）时产生盘符相对路径。
+fn abs_clean(p: &Path) -> PathBuf {
+    match std::fs::canonicalize(p) {
+        Ok(v) => {
+            let s = v.to_string_lossy();
+            match s.strip_prefix(r"\\?\\") {
+                Some(rest) => PathBuf::from(rest),
+                None => v,
+            }
+        }
+        Err(_) => p.to_path_buf(),
+    }
+}
+
 
 /// 资源路径集（打包与开发两形态同构）。
 #[derive(Clone)]
@@ -56,10 +71,10 @@ pub fn resolve_paths<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> BoxResult<
     let home_override = std::env::var("DSH_NOVEL_HOME").ok().filter(|s| !s.trim().is_empty());
     let user_home = std::env::var(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
         .unwrap_or_else(|_| ".".into());
-    let dsh_home = match home_override {
+    let dsh_home = abs_clean(&match home_override {
         Some(h) => PathBuf::from(h),
         None => Path::new(&user_home).join(".dsh-novel"),
-    };
+    });
     let app_data = app
         .path()
         .app_config_dir()
@@ -68,7 +83,7 @@ pub fn resolve_paths<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> BoxResult<
     // 打包形态：resource_dir 下 {kernel, agents, scripts, node}
     if let Ok(r) = app.path().resource_dir() {
         // verbatim 绝对化：杜绝盘符相对路径（'D:xxx'）传入 node 导致 EISDIR
-        let r = std::fs::canonicalize(&r).unwrap_or(r);
+        let r = abs_clean(&r);
         let kernel_bin = r
             .join("kernel").join("node_modules").join("@deepseek-ai")
             .join("dsh").join("lib").join("bin.js");
@@ -96,7 +111,7 @@ pub fn resolve_paths<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> BoxResult<
 
     // 开发形态：app/{kernel,agents,scripts}，node 用系统 PATH。
     let base = dev_base().unwrap_or_else(|| PathBuf::from("."));
-    let base = std::fs::canonicalize(&base).unwrap_or(base);
+    let base = abs_clean(&base);
     let kernel_bin = base
         .join("kernel").join("node_modules").join("@deepseek-ai")
         .join("dsh").join("lib").join("bin.js");
