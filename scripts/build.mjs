@@ -247,7 +247,7 @@ log("组装便携版…");
 const exePath = path.join(tauriDir, "target", "release");
 let portableName;
 if (platform === "win") {
-  portableName = "DSH-Novel-win-x64";
+  portableName = "DSH-Novel-" + VERSION + "-win-x64";
   const pdir = path.join(distDir, portableName);
   fs.rmSync(pdir, { recursive: true, force: true });
   fs.mkdirSync(pdir, { recursive: true });
@@ -261,7 +261,7 @@ if (platform === "win") {
   artifacts.push(zipPath);
 } else {
   // POSIX：tar.gz（含 app 或 bundle）
-  portableName = "DSH-Novel-" + platform + "-" + arch;
+  portableName = "DSH-Novel-" + VERSION + "-" + platform + "-" + arch;
   const pdir = path.join(distDir, portableName);
   fs.rmSync(pdir, { recursive: true, force: true });
   fs.mkdirSync(pdir, { recursive: true });
