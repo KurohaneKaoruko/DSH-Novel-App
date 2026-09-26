@@ -1,6 +1,6 @@
 [package]
 name = "dsh-novel"
-version = "1.0.3"
+version = "1.0.4"
 description = "DSH-Novel —— 基于 DeepSeek Harness 的小说写作工作台（原版 WebUI + 文件面板）"
 authors = ["KurohaneKaoruko"]
 license = "MIT"

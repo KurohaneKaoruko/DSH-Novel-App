@@ -126,14 +126,18 @@ pub fn pick_port(base: u16) -> u16 {
 }
 
 fn provision(paths: &Paths) -> BoxResult<()> {
+    // 脚本定位与其父目录绑定：CWD = 脚本目录，argv 只传文件名，
+    // 彻底规避 node 主模块解析对任何盘符相对/异常路径形态的 realpath（EISDIR）。
+    let script_dir = paths.provision_script.parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| paths.dsh_home.clone());
     let mut child = Command::new(&paths.node_bin)
-        .arg(&paths.provision_script)
+        .arg("provision-home.mjs")
         .arg("--home").arg(&paths.dsh_home)
         .arg("--library").arg(&paths.library)
         .env("DSH_HOME", &paths.dsh_home)
-        // 关键：显式设置绝对工作目录。双击启动时 Windows 可能给出盘符相对
-        // CWD（如 "D:"），node 模块解析对其 realpath 会 EISDIR 直接炸掉。
-        .current_dir(&paths.dsh_home)
+        // CWD = 脚本目录（verbatim 绝对路径），node 主模块解析不再依赖外部 CWD。
+        .current_dir(&script_dir)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()?;
