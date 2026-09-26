@@ -1,4 +1,4 @@
-use std::io::{BufRead, BufReader};
+use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
@@ -139,7 +139,8 @@ fn provision(paths: &Paths) -> BoxResult<()> {
         }
     };
     if !status.success() {
-        let err = String::from_utf8_lossy(&child.wait_with_output()?.stderr);
+        let out = child.wait_with_output()?;
+        let err = String::from_utf8_lossy(&out.stderr);
         return Err(format!("provision 失败：{}", err.trim()).into());
     }
     Ok(())
