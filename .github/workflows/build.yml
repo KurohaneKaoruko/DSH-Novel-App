@@ -83,6 +83,13 @@ jobs:
       - name: Checksums
         run: |
           cd dist && sha256sum * > checksums.txt || true
+      - name: Clean stale assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for a in $(gh release view "$GITHUB_REF_NAME" --json assets -q '.assets[].name' 2>/dev/null); do
+            gh release delete-asset "$GITHUB_REF_NAME" "$a" -y || true
+          done
       - uses: softprops/action-gh-release@v2
         with:
           overwrite: true

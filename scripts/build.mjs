@@ -237,9 +237,9 @@ function collect(rel, outName) {
   artifacts.push(dest);
   log("收集 " + outName);
 }
-collect(path.join("nsis", "DSH-Novel_" + VERSION + "_x64-setup.exe"), "DSH-Novel-setup-x64.exe");
-collect(path.join("dmg", "DSH-Novel_" + VERSION + "_aarch64.dmg"), "DSH-Novel-macos-arm64.dmg");
-collect(path.join("deb", "dsh-novel_" + VERSION + "_amd64.deb"), "DSH-Novel-linux-x64.deb");
+collect(path.join("nsis", "DSH-Novel_" + VERSION + "_x64-setup.exe"), "DSH-Novel-" + VERSION + "-setup-x64.exe");
+collect(path.join("dmg", "DSH-Novel_" + VERSION + "_aarch64.dmg"), "DSH-Novel-" + VERSION + "-macos-arm64.dmg");
+collect(path.join("deb", "dsh-novel_" + VERSION + "_amd64.deb"), "DSH-Novel-" + VERSION + "-linux-x64.deb");
 
 // ---- 5. 便携 zip（exe/app + resources） ---------------------------------------
 
