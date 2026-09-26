@@ -17,6 +17,7 @@ const appRoot = path.resolve(url.fileURLToPath(new URL("..", import.meta.url)));
 const repoRoot = path.resolve(appRoot, "..");
 const distDir = path.join(appRoot, "dist");
 const staging = path.join(appRoot, "src-tauri", "staging");
+const VERSION = JSON.parse(fs.readFileSync(path.join(appRoot, "src-tauri", "tauri.conf.json"), "utf8")).version;
 const tauriDir = path.join(appRoot, "src-tauri");
 
 const args = process.argv.slice(2);
@@ -236,9 +237,9 @@ function collect(rel, outName) {
   artifacts.push(dest);
   log("收集 " + outName);
 }
-collect(path.join("nsis", "DSH-Novel_1.0.0_x64-setup.exe"), "DSH-Novel-setup-x64.exe");
-collect(path.join("dmg", "DSH-Novel_1.0.0_aarch64.dmg"), "DSH-Novel-macos-arm64.dmg");
-collect(path.join("deb", "dsh-novel_1.0.0_amd64.deb"), "DSH-Novel-linux-x64.deb");
+collect(path.join("nsis", "DSH-Novel_" + VERSION + "_x64-setup.exe"), "DSH-Novel-setup-x64.exe");
+collect(path.join("dmg", "DSH-Novel_" + VERSION + "_aarch64.dmg"), "DSH-Novel-macos-arm64.dmg");
+collect(path.join("deb", "dsh-novel_" + VERSION + "_amd64.deb"), "DSH-Novel-linux-x64.deb");
 
 // ---- 5. 便携 zip（exe/app + resources） ---------------------------------------
 
