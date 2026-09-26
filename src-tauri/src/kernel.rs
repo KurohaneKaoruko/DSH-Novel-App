@@ -2,8 +2,13 @@ use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
+
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 use tauri::{AppHandle, Manager};
 
@@ -66,6 +71,8 @@ pub fn resolve_paths<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> BoxResult<
 
     // 打包形态：resource_dir 下 {kernel, agents, scripts, node}
     if let Ok(r) = app.path().resource_dir() {
+        // verbatim 绝对化：杜绝盘符相对路径（'D:xxx'）传入 node 导致 EISDIR
+        let r = std::fs::canonicalize(&r).unwrap_or(r);
         let kernel_bin = r
             .join("kernel").join("node_modules").join("@deepseek-ai")
             .join("dsh").join("lib").join("bin.js");
@@ -93,6 +100,13 @@ pub fn resolve_paths<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> BoxResult<
 
     // 开发形态：app/{kernel,agents,scripts}，node 用系统 PATH。
     let base = dev_base().unwrap_or_else(|| PathBuf::from("."));
+    let base = std::fs::canonicalize(&base).unwrap_or(base);
+    let kernel_bin = base
+        .join("kernel").join("node_modules").join("@deepseek-ai")
+        .join("dsh").join("lib").join("bin.js");
+    if !kernel_bin.exists() {
+        return Err("kernel bin.js not found（安装资源缺失或损坏）".into());
+    }
     Ok(Paths {
         node_bin: "node".into(),
         kernel_bin: base
@@ -126,6 +140,7 @@ fn provision(paths: &Paths) -> BoxResult<()> {
         .current_dir(&paths.dsh_home)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
+        .creation_flags(CREATE_NO_WINDOW)
         .spawn()?;
     let start = Instant::now();
     let status = loop {
@@ -284,6 +299,7 @@ pub fn boot(handle: AppHandle) -> BoxResult<()> {
         .env("DSH_TELEMETRY_DISABLED", "1")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
+        .creation_flags(CREATE_NO_WINDOW)
         .spawn()?;
 
     let stdout = child.stdout.take();
