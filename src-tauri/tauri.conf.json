@@ -43,7 +43,6 @@
       "nsis": {
         "installerIcon": "icons/icon.ico",
         "installMode": "currentUser",
-        "webview2InstallMode": { "type": "downloadBootstrapper" },
         "languages": ["SimpChinese", "English"],
         "displayLanguageSelector": true
       }
