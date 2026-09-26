@@ -299,6 +299,19 @@ pub fn boot(handle: AppHandle) -> BoxResult<()> {
     std::fs::create_dir_all(&paths.dsh_home)?;
     set_status(&handle, "正在初始化智能体预设（provision）…");
     provision(&paths)?;
+
+    // 自愈：早期版本残留的残缺 profiles/node_modules 会让 dsh web 跳过 bundle
+    // 重装并以 "plugin could not be resolved" 崩溃。检测到关键包缺失就清掉，
+    // 让内核重新完整安装（一次性自愈）。
+    let critical = paths.dsh_home.join("profiles").join("node_modules")
+        .join("@deepseek-ai").join("dsh-attachment-local");
+    let nm_dir = paths.dsh_home.join("profiles").join("node_modules");
+    if nm_dir.exists() && !critical.exists() {
+        boot_log("profiles/node_modules 缺少关键插件包，清理以触发重装…");
+        set_status(&handle, "检测到插件包不完整，正在清理重装（一次性）…");
+        std::fs::remove_dir_all(&nm_dir)?;
+    }
+
     set_status(&handle, "正在启动 DSH 内核…");
 
     let port = pick_port(51820);
