@@ -143,137 +143,7 @@ fn provision(paths: &Paths) -> BoxResult<()> {
         return Err(format!("provision 失败：{}", err.trim()).into());
     }
     Ok(())
-}e std::io::{BufRead, BufReader};
-use std::net::TcpListener;
-use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Stdio};
-use std::sync::Mutex;
-use std::time::{Duration, Instant};
-
-use tauri::{AppHandle, Manager};
-
-pub type BoxResult<T> = Result<T, Box<dyn std::error::Error>>;
-
-/// 资源路径集（打包与开发两形态同构）。
-#[derive(Clone)]
-pub struct Paths {
-    pub node_bin: String,
-    pub kernel_bin: PathBuf,
-    pub provision_script: PathBuf,
-    pub library: PathBuf,
-    pub dsh_home: PathBuf,
-    pub app_data: PathBuf,
 }
-
-/// 内核进程状态（Drop 时杀进程）。
-pub struct KernelState {
-    pub child: Option<Child>,
-    pub kernel_port: u16,
-    pub last_error: Option<String>,
-}
-
-impl KernelState {
-    pub fn new() -> Self {
-        Self { child: None, kernel_port: 0, last_error: None }
-    }
-
-    pub fn kill(&mut self) {
-        if let Some(mut c) = self.child.take() {
-            let _ = c.kill();
-            let _ = c.wait();
-        }
-    }
-}
-
-impl Drop for KernelState {
-    fn drop(&mut self) {
-        self.kill();
-    }
-}
-
-fn dev_base() -> Option<PathBuf> {
-    option_env!("CARGO_MANIFEST_DIR")
-        .and_then(|d| Path::new(d).parent().map(|p| p.to_path_buf()))
-}
-
-pub fn resolve_paths<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> BoxResult<Paths> {
-    let home_override = std::env::var("DSH_NOVEL_HOME").ok().filter(|s| !s.trim().is_empty());
-    let user_home = std::env::var(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
-        .unwrap_or_else(|_| ".".into());
-    let dsh_home = match home_override {
-        Some(h) => PathBuf::from(h),
-        None => Path::new(&user_home).join(".dsh-novel"),
-    };
-    let app_data = app
-        .path()
-        .app_config_dir()
-        .unwrap_or_else(|_| dsh_home.clone());
-
-    // 打包形态：resource_dir 下 {kernel, agents, scripts, node}
-    if let Ok(r) = app.path().resource_dir() {
-        let kernel_bin = r
-            .join("kernel").join("node_modules").join("@deepseek-ai")
-            .join("dsh").join("lib").join("bin.js");
-        if kernel_bin.exists() {
-            let node_candidate = if cfg!(windows) {
-                r.join("node").join("node.exe")
-            } else {
-                r.join("node").join("bin").join("node")
-            };
-            let node_bin = if node_candidate.exists() {
-                node_candidate.to_string_lossy().into_owned()
-            } else {
-                "node".to_string()
-            };
-            return Ok(Paths {
-                node_bin,
-                kernel_bin,
-                provision_script: r.join("scripts").join("provision-home.mjs"),
-                library: r.join("agents"),
-                dsh_home,
-                app_data,
-            });
-        }
-    }
-
-    // 开发形态：app/{kernel,agents,scripts}，node 用系统 PATH。
-    let base = dev_base().unwrap_or_else(|| PathBuf::from("."));
-    Ok(Paths {
-        node_bin: "node".into(),
-        kernel_bin: base
-            .join("kernel").join("node_modules").join("@deepseek-ai")
-            .join("dsh").join("lib").join("bin.js"),
-        provision_script: base.join("scripts").join("provision-home.mjs"),
-        library: base.join("agents"),
-        dsh_home,
-        app_data,
-    })
-}
-
-/// 挑一个可用端口（绑定即释放，存在极小竞态——可接受）。
-pub fn pick_port(base: u16) -> u16 {
-    for p in base..base + 40 {
-        if TcpListener::bind(("127.0.0.1", p)).is_ok() {
-            return p;
-        }
-    }
-    base
-}
-
-fn provision(paths: &Paths) -> BoxResult<()> {
-    let status = Command::new(&paths.node_bin)
-        .arg(&paths.provision_script)
-        .arg("--home").arg(&paths.dsh_home)
-        .arg("--library").arg(&paths.library)
-        .env("DSH_HOME", &paths.dsh_home)
-        .output()?;
-    if !status.status.success() {
-        let err = String::from_utf8_lossy(&status.stderr);
-        return Err(format!("provision 失败：{}", err.trim()).into());
-    }
-    Ok(())
-}
-
 // ---- token URL 捕获（stdout/stderr 读线程 → 全局缓冲） ----
 
 static TOKEN_URL: Mutex<Option<String>> = Mutex::new(None);
@@ -332,7 +202,7 @@ pub fn set_status(handle: &AppHandle, msg: &str) {
     });
 }
 
-/// boot 过程日志（<dsh_home>/logs/boot.log），便于用户机器上事后排查。
+/// boot 过程日志（<dsh_home>/logs/boot.log）。
 pub fn boot_log(msg: &str) {
     let home = std::env::var("DSH_NOVEL_HOME").ok().unwrap_or_else(|| {
         std::env::var(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
@@ -349,7 +219,6 @@ pub fn boot_log(msg: &str) {
     let _ = std::fs::OpenOptions::new().create(true).append(true)
         .open(dir.join("boot.log")).and_then(|mut f| f.write_all(line.as_bytes()));
 }
-
 /// 轻量匹配 http(s)://127.0.0.1:PORT/?token=XXXX（不用正则依赖）。
 fn extract_token_url(line: &str) -> Option<String> {
     let bt = char::from(96);
@@ -384,7 +253,6 @@ fn extract_token_url(line: &str) -> Option<String> {
 
 /// 启动内核并等待 token URL（回退：HTTP 就绪后用普通 URL）。
 pub fn boot(handle: AppHandle) -> BoxResult<()> {
-    set_status(&handle, "正在定位运行资源…");
     let paths = resolve_paths(&handle)?;
     std::fs::create_dir_all(&paths.dsh_home)?;
     set_status(&handle, "正在初始化智能体预设（provision）…");
