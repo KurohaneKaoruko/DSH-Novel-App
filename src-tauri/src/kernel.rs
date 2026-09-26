@@ -15,7 +15,7 @@ fn abs_clean(p: &Path) -> PathBuf {
     match std::fs::canonicalize(p) {
         Ok(v) => {
             let s = v.to_string_lossy();
-            match s.strip_prefix(r"\\?\\") {
+            match s.strip_prefix("\\\\?\\") {
                 Some(rest) => PathBuf::from(rest),
                 None => v,
             }
