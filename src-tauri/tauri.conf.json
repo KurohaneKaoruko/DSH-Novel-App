@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "DSH-Novel",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "identifier": "io.github.kurohanekaoruko.dsh-novel",
   "build": {
     "frontendDist": "../ui"
@@ -41,6 +41,9 @@
     },
     "windows": {
       "nsis": {
+        "installerIcon": "icons/icon.ico",
+        "installMode": "currentUser",
+        "webview2InstallMode": { "type": "downloadBootstrapper" },
         "languages": ["SimpChinese", "English"],
         "displayLanguageSelector": true
       }

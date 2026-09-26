@@ -121,6 +121,9 @@ fn provision(paths: &Paths) -> BoxResult<()> {
         .arg("--home").arg(&paths.dsh_home)
         .arg("--library").arg(&paths.library)
         .env("DSH_HOME", &paths.dsh_home)
+        // 关键：显式设置绝对工作目录。双击启动时 Windows 可能给出盘符相对
+        // CWD（如 "D:"），node 模块解析对其 realpath 会 EISDIR 直接炸掉。
+        .current_dir(&paths.dsh_home)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()?;
@@ -254,7 +257,16 @@ fn extract_token_url(line: &str) -> Option<String> {
 
 /// 启动内核并等待 token URL（回退：HTTP 就绪后用普通 URL）。
 pub fn boot(handle: AppHandle) -> BoxResult<()> {
+    let exe = std::env::current_exe().map(|p| p.to_string_lossy().into_owned()).unwrap_or_default();
+    let cwd = std::env::current_dir().map(|p| p.to_string_lossy().into_owned()).unwrap_or_default();
+    boot_log(&format!("launch exe={exe} cwd={cwd}"));
+    set_status(&handle, "正在定位运行资源…");
     let paths = resolve_paths(&handle)?;
+    boot_log(&format!(
+        "resolved node={} kernel={} provision={} library={} home={}",
+        paths.node_bin, paths.kernel_bin.display(), paths.provision_script.display(),
+        paths.library.display(), paths.dsh_home.display()
+    ));
     std::fs::create_dir_all(&paths.dsh_home)?;
     set_status(&handle, "正在初始化智能体预设（provision）…");
     provision(&paths)?;
