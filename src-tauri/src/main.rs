@@ -60,8 +60,25 @@ fn boot_app(handle: &tauri::AppHandle) -> BoxResult<()> {
     // 2. 后台拉起内核（provision → dsh web → token URL → 主窗口跳转）
     let h = handle.clone();
     std::thread::spawn(move || {
-        if let Err(e) = kernel::boot(h) {
-            eprintln!("[dsh-novel] 内核启动失败：{e}");
+        let h2 = h.clone();
+        let r = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || kernel::boot(h2)));
+        match r {
+            Ok(Ok(())) => {}
+            Ok(Err(e)) => {
+                eprintln!("[dsh-novel] 内核启动失败：{e}");
+                kernel::surface_error(&h, &format!("{e}"));
+            }
+            Err(p) => {
+                let msg = match p.downcast_ref::<&str>() {
+                    Some(s) => s.to_string(),
+                    None => match p.downcast_ref::<String>() {
+                        Some(s) => s.clone(),
+                        None => "boot thread panicked".into(),
+                    },
+                };
+                eprintln!("[dsh-novel] boot panic：{msg}");
+                kernel::surface_error(&h, &format!("启动线程异常：{msg}"));
+            }
         }
     });
     Ok(())
