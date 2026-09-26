@@ -2,17 +2,30 @@ use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-#[cfg(windows)]
-use std::os::windows::process::CommandExt;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
-
-#[cfg(windows)]
-const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 use tauri::{AppHandle, Manager};
 
 pub type BoxResult<T> = Result<T, Box<dyn std::error::Error>>;
+
+/// 子进程不创建控制台窗口（Windows GUI 宿主启动 node 子进程时避免黑框闪现）。
+trait SpawnPrivacy {
+    fn no_window(&mut self);
+}
+
+#[cfg(windows)]
+impl SpawnPrivacy for Command {
+    fn no_window(&mut self) {
+        use std::os::windows::process::CommandExt;
+        self.creation_flags(0x0800_0000);
+    }
+}
+
+#[cfg(not(windows))]
+impl SpawnPrivacy for Command {
+    fn no_window(&mut self) {}
+}
 
 /// 资源路径集（打包与开发两形态同构）。
 #[derive(Clone)]
@@ -140,7 +153,7 @@ fn provision(paths: &Paths) -> BoxResult<()> {
         .current_dir(&paths.dsh_home)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .creation_flags(CREATE_NO_WINDOW)
+        .no_window()
         .spawn()?;
     let start = Instant::now();
     let status = loop {
@@ -299,7 +312,7 @@ pub fn boot(handle: AppHandle) -> BoxResult<()> {
         .env("DSH_TELEMETRY_DISABLED", "1")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .creation_flags(CREATE_NO_WINDOW)
+        .no_window()
         .spawn()?;
 
     let stdout = child.stdout.take();
